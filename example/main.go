@@ -5,8 +5,8 @@ import (
 )
 
 func main() {
-	log := lfshook.NewFileLogger("/var/log/info.log", "/var/log/error.log")
-	log.Info("info hello")
-	log.Info("info hello")
-	log.Error("error hello")
+	log := lfshook.NewFileLogger("/var/log/info.log", "/var/log/error.log", 1)
+
+	log.Info("hello info")
+	log.Error("hello error")
 }

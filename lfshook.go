@@ -186,9 +186,9 @@ func (hook *LfsHook) fileWrite(entry *logrus.Entry) error {
 
 	writer := &lumberjack.Logger{
 		Filename:   path,
-		MaxSize:    10, // 10M
-		MaxBackups: 5,  // keep 5 file
-		MaxAge:     7,  //  7 day
+		MaxSize:    maxSize, // maxSize M
+		MaxBackups: 2,       // keep 5 file
+		MaxAge:     7,       //  7 day
 	}
 	defer writer.Close()
 	writer.Write(msg)
@@ -202,10 +202,12 @@ func (hook *LfsHook) Levels() []logrus.Level {
 
 var log *logrus.Logger
 var once sync.Once
+var maxSize int
 
 //NewFileLogger 初始化 logger
-func NewFileLogger(infoPath, errorPath string) *logrus.Logger {
+func NewFileLogger(infoPath, errorPath string, size int) *logrus.Logger {
 	once.Do(func() {
+		maxSize = size
 		pathMap := PathMap{
 			logrus.InfoLevel:  infoPath,
 			logrus.ErrorLevel: errorPath,
