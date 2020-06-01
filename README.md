@@ -4,6 +4,8 @@
 
 Sometimes developers like to write directly to a file on the filesystem. This is a hook for [`logrus`](https://github.com/sirupsen/logrus) which designed to allow users to do that. The log levels are dynamic at instantiation of the hook, so it is capable of logging at some or all levels.
 
+[文件大小/覆盖等] (https://github.com/natefinch/lumberjack)
+
 ## Example
 ```go
 import (

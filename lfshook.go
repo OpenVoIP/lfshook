@@ -3,13 +3,12 @@ package lfshook
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"io"
-	"log"
-	"os"
-	"path/filepath"
 	"reflect"
 	"sync"
+
+	"github.com/sirupsen/logrus"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // We are logging to file, strip colors to make the output more readable.
@@ -23,6 +22,15 @@ type PathMap map[logrus.Level]string
 // Multiple levels may share a writer, but multiple writers may not be used for one level.
 type WriterMap map[logrus.Level]io.Writer
 
+type RotateFileConfig struct {
+	Filename   string
+	MaxSize    int
+	MaxBackups int
+	MaxAge     int
+	Level      logrus.Level
+	Formatter  logrus.Formatter
+}
+
 // LfsHook is a hook to handle writing to local log files.
 type LfsHook struct {
 	paths     PathMap
@@ -30,6 +38,8 @@ type LfsHook struct {
 	levels    []logrus.Level
 	lock      *sync.Mutex
 	formatter logrus.Formatter
+
+	Config RotateFileConfig
 
 	defaultPath      string
 	defaultWriter    io.Writer
@@ -152,7 +162,6 @@ func (hook *LfsHook) ioWrite(entry *logrus.Entry) error {
 // Write a log line directly to a file.
 func (hook *LfsHook) fileWrite(entry *logrus.Entry) error {
 	var (
-		fd   *os.File
 		path string
 		msg  []byte
 		err  error
@@ -167,16 +176,6 @@ func (hook *LfsHook) fileWrite(entry *logrus.Entry) error {
 		}
 	}
 
-	dir := filepath.Dir(path)
-	os.MkdirAll(dir, os.ModePerm)
-
-	fd, err = os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
-	if err != nil {
-		log.Println("failed to open logfile:", path, err)
-		return err
-	}
-	defer fd.Close()
-
 	// use our formatter instead of entry.String()
 	msg, err = hook.formatter.Format(entry)
 
@@ -184,11 +183,38 @@ func (hook *LfsHook) fileWrite(entry *logrus.Entry) error {
 		log.Println("failed to generate string for entry:", err)
 		return err
 	}
-	fd.Write(msg)
+
+	writer := &lumberjack.Logger{
+		Filename:   path,
+		MaxSize:    10, // 10M
+		MaxBackups: 5,  // keep 5 file
+		MaxAge:     7,  //  7 day
+	}
+	defer writer.Close()
+	writer.Write(msg)
 	return nil
 }
 
 // Levels returns configured log levels.
 func (hook *LfsHook) Levels() []logrus.Level {
 	return logrus.AllLevels
+}
+
+var log *logrus.Logger
+var once sync.Once
+
+//NewFileLogger 初始化 logger
+func NewFileLogger(infoPath, errorPath string) *logrus.Logger {
+	once.Do(func() {
+		pathMap := PathMap{
+			logrus.InfoLevel:  infoPath,
+			logrus.ErrorLevel: errorPath,
+		}
+		log = logrus.New()
+		log.Hooks.Add(NewHook(
+			pathMap,
+			&logrus.JSONFormatter{},
+		))
+	})
+	return log
 }
